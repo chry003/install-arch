@@ -1,168 +1,211 @@
-echo "Connect to internet wifi"
+# variable
 
-iwctl device list
-
-echo "Enter Device Name: "
-
-deviceName=""
-read deviceName
-
-echo "Enter SSID: "
-
-ssid=""
-read ssid
-
-echo "Enter Password: "
-
-pass=""
-read pass
-
-iwctl --passphrase $pass station $deviceName connect $ssid
-
-
-echo "Connected to internet."
-echo "Testing..."
-
-ping www.google.com
-
-
-clear
-
-echo "Keymapping Setup"
-
-ls /usr/share/kbd/keymaps/**/*.map.gz | less
-
-echo "Enter name of key map: "
-
-keyMap=""
-read keyMap
-
-loadkeys $keyMap
-
-echo "Done..."
-
-clear
-
-echo "Timezone Setup"
-
-timedatectl --list-timezone
-
-echo "Enter timezone:"
-
-timeZone=""
-read timeZone
-
-timedatectl --set-timezone $timeZone
-timedatectl set-ntp true
-timedatectl status
-
-clear
-
-echo "Disk Setup"
-
-fdisk -l
-
-echo "Disk Name: "
-
-diskName=""
-read diskName
-
-fdisk $diskName
-
-clear
-
-echo "EFI: "
-
+netdevice=""
+netssid=""
+netpass=""
+keymap=""
+timezone=""
+disk=""
 efi=""
-read efi
-
-echo "Swap: "
-
 swap=""
-read swap
-
-echo "Linux Filesystem: "
-
-lfs=""
-read lfs
-
-
-mkfs.fat -F32 $efi
-mkswap $swap
-swapon $swap
-mkfs.ext4 $lfs
-mount $lfs /mnt
-
-clear
-
-pacstrap /mnt base linux-lts linux-firmware
-
-genfstab -U /mnt >> /mnt/etc/fstab
-arch-chroot /mnt
-
-ls /usr/share/zoneinfo/
-
-echo "Select region: "
-
-rgn=""
-read rgn
-
-ls /usr/share/zoneinfo/$rgn/
-
-echo "Select city: "
-
+rootfs=""
+region=""
 city=""
-read city
-
-ln -sf /usr/share/zoneinfo/$rgn/$city /etc/localtime
-
-hwclock -systohc
-
-pacman -S neovim
-nvim /etc/locale.gen
-locale-gen
-
-echo "Enter hostname: "
-
 hostname=""
-read hostname
-
-touch /etc/hostname
-echo $hostname > /etc/hostname
-
-echo "
-127.0.0.1   localhost
-::1         localhost
-127.0.0.1   $hostname.localdomain   $hostname
-" > /etc/hosts
-
-cat /etc/hosts
-
-passwd
-
-
-echo "user: "
-
 user=""
-read user
 
-useradd -m $user
-passwd $user
+function Network()
+{
+	iwctl device list
 
-usermod -aG wheel,audio,video,storage,optical,$user $user
+	echo "Device: "
+	read netdevice
 
-pacman -S sudo grub efibootmgr dosfstools os-prober mtools
+	iwctl station $netdevice scan
+	iwctl station $netdevice get-networks
 
-mkdir /boot/EFI
-mount /dev/$efi /boot/EFI
+	echo "SSID: "
+	read netssid
 
-grub-install --target=x86_64-efi --bootloader-id=grub_uefi --recheck
-grub-mkconfig -o /boot/grub/grub.cfg
+	echo "Passphrase: "
+	read netpass
 
-pacman -S iwd iw wireless_tools wpa_supplicant nm-connection-editor networkmanager neovim git
+	iwctl --passphrase $netpass station $netdevice connect $netssid
+}
 
-systemctl enable NetworkManager
+function KeyMapping()
+{
+	ls /usr/share/kbd/keymaps/**/*.map.gz | less
+	
+	echo "Keymap: "
+	read keymap
 
-umount -l /mnt
+	loadkeys $keymap
+}
 
-reboot
+function Timezone()
+{
+	timedatectl list-timezones
+
+	echo "Timezone: "
+	read timezone
+
+	timedatectl set-timezone $timezone
+	timedatectl set-ntp true
+	timedatectl status
+}
+
+function Disk()
+{
+	fdisk -l
+
+	echo "Disk: "
+	read disk
+
+	fdisk $disk
+
+	clear
+
+	echo "EFI: "
+	read efi
+
+	echo "Swap: "
+	read swap
+
+	echo "Linux Filesystem: "
+	read rootfs
+
+
+	mkfs.fat -F32 $efi
+	mkswap $swap
+	swapon $swap
+	mkfs.ext4 $rootfs
+	mount $rootfs /mnt
+}
+
+function BaseInstallation()
+{
+	pacstrap /mnt base linux-lts linux-firmware
+
+	genfstab -U /mnt >> /mnt/etc/fstab
+	cp ~/install-arch/install.sh /mnt
+	arch-chroot /mnt && ./install.sh
+}
+
+function ZoneInfo()
+{
+	ls /usr/share/zoneinfo/
+
+	echo "Select region: "
+	read region
+
+	ls /usr/share/zoneinfo/$region/
+
+	echo "Select city: "
+	read city
+
+	ln -sf /usr/share/zoneinfo/$region/$city /etc/localtime
+
+	hwclock --systohc
+
+	pacman -S neovim
+	neovim /etc/locale.gen
+	locale-gen
+}
+
+function User()
+{
+	echo "Hostname: "
+	read hostname
+
+	touch /etc/hostname
+	echo $hostname > /etc/hostname
+
+	echo "
+	127.0.0.1   localhost
+	::1         localhost
+	127.0.0.1   $hostname.localdomain   $hostname
+	" > /etc/hosts
+
+	echo "Root Password: "
+	passwd
+
+
+	echo "New User: "
+	read user
+
+	useradd -m $user
+
+	echo "$user password: "
+	passwd $user
+
+	usermod -aG wheel,audio,video,storage,optical,$user $user
+}
+
+
+function Install()
+{
+	pacman -S sudo grub efibootmgr dosfstools os-prober mtools
+
+	mkdir /boot/EFI
+	mount /dev/$efi /boot/EFI
+
+	grub-install --target=x86_64-efi --bootloader-id=grub_uefi --recheck
+	grub-mkconfig -o /boot/grub/grub.cfg
+
+	pacman -S iwd iw wireless_tools wpa_supplicant nm-connection-editor networkmanager neovim git
+
+	systemctl enable NetworkManager
+
+	EDITOR=nvim visudo
+}
+
+
+
+function takeInput()
+{
+	read input
+	echo $input
+}
+
+function checkInput()
+{
+	if [[ $1 == "1" ]]; then
+		Network
+	elif [[ $1 == "2" ]]; then
+		KeyMapping
+	elif [[ $1 == "3" ]]; then
+		Timezone
+	elif [[ $1 == "4" ]]; then
+		Disk
+	elif [[ $1 == "5" ]]; then
+		BaseInstallation
+	elif [[ $1 == "6" ]]; then
+		ZoneInfo
+	elif [[ $1 == "7" ]]; then
+		User
+	elif [[ $1 == "8" ]]; then
+		Install
+	elif [[ $1 == "0" ]]; then
+		umount -l /mnt
+		reboot
+	fi
+}
+
+
+echo "==========================="
+echo "[Arch base linux installer]"
+echo "==========================="
+
+echo "1) Network"
+echo "2) Keymap"
+echo "3) Timezone"
+echo "4) Disk"
+echo "5) Base Install"
+echo "6) Zone Info"
+echo "7) User setup"
+echo "8) Install"
+echo "0) Reboot"
+
+option=$(takeInput)
+checkInput $option
