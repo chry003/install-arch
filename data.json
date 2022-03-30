@@ -1,0 +1,27 @@
+{
+    "Network": {
+        "dev": "wlan0",
+        "ssid": "Chauhan_2.4g",
+        "pass": "9935223226"
+    },
+    "Keymap": {
+        "keymap": ""
+    },
+    "Timezone": {
+        "timezone": "Asia/Kolkata"
+    },
+    "Disk": {
+        "disk": "/dev/sda1",
+        "efi": "",
+        "swap": "",
+        "rootfs": ""
+    },
+    "Zone": {
+        "region": "",
+        "city": ""
+    },
+    "User": {
+        "hostname": "",
+        "user": ""
+    }
+}

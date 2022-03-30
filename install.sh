@@ -1,56 +1,50 @@
-# variable
+input=""
 
-netdevice=""
-netssid=""
-netpass=""
-keymap=""
-timezone=""
-disk=""
-efi=""
-swap=""
-rootfs=""
-region=""
-city=""
-hostname=""
-user=""
+function getValue()
+{
+   echo $(python save.py $1 $2)
+}
+
+function setValue()
+{
+    python save.py $1 $2 $3
+}
+
+function takeInput()
+{
+    echo ""
+    echo -n "$1> "
+    read input
+}
 
 function Network()
 {
 	iwctl device list
-
-	echo "Device: "
-	read netdevice
-
-	iwctl station $netdevice scan
-	iwctl station $netdevice get-networks
-
-	echo "SSID: "
-	read netssid
-
-	echo "Passphrase: "
-	read netpass
-
-	iwctl --passphrase $netpass station $netdevice connect $netssid
+    takeInput "Device"
+    setValue "Network" "dev" $input
+	iwctl station $(getValue "Network" "dev") scan
+	iwctl station $(getValue "Network" "dev") get-networks
+    takeInput "ssid"
+    setValue "Network" "ssid" $input
+    takeInput "pass"
+    setValue "Network" "pass" $input
+	iwctl --passphrase $(getValue "Network" "pass") station $(getValue "Network" "dev") connect $(getValue "Network" "ssid")
 }
 
 function KeyMapping()
 {
 	ls /usr/share/kbd/keymaps/**/*.map.gz | less
-	
-	echo "Keymap: "
-	read keymap
-
-	loadkeys $keymap
+    takeInput "Keymap"
+    setValue "Keymap" "keymap" $input
+	loadkeys $(getValue "Keymap" "keymap")
 }
 
 function Timezone()
 {
 	timedatectl list-timezones
-
-	echo "Timezone: "
-	read timezone
-
-	timedatectl set-timezone $timezone
+    takeInput "Timzone"
+    setValue "Timezone" "timezone" $input
+	timedatectl set-timezone $(getValue "Timezone" "timezone")
 	timedatectl set-ntp true
 	timedatectl status
 }
@@ -58,29 +52,26 @@ function Timezone()
 function Disk()
 {
 	fdisk -l
-
-	echo "Disk: "
-	read disk
-
-	fdisk $disk
-
+    takeInput "Disk"
+    setValue "Disk" "disk" $input
+	fdisk $(getValue "Disk" "disk")
 	clear
 
-	echo "EFI: "
-	read efi
+    takeInput "EFI"
+    setValue "Disk" "efi" $input
+    
+    takeInput "swap"
+    setValue "Disk" "swap" $input
 
-	echo "Swap: "
-	read swap
-
-	echo "Linux Filesystem: "
-	read rootfs
+    takeInput "Linux Filesystem"
+    setValue "Disk" "rootfs" $input
 
 
-	mkfs.fat -F32 $efi
-	mkswap $swap
-	swapon $swap
-	mkfs.ext4 $rootfs
-	mount $rootfs /mnt
+	mkfs.fat -F32 $(getValue "Disk" "efi")
+	mkswap $(getValue "Disk" "swap")
+	swapon $(getValue "Disk" "swap")
+	mkfs.ext4 $(getValue "Disk" "rootfs")
+	mount $(getValue "Disk" "rootfs") /mnt
 }
 
 function BaseInstallation()
@@ -88,23 +79,24 @@ function BaseInstallation()
 	pacstrap /mnt base linux-lts linux-firmware
 
 	genfstab -U /mnt >> /mnt/etc/fstab
-	cp ~/install-arch/install.sh /mnt
-	arch-chroot /mnt && ./install.sh
+    echo "run ./install-arch/install.sh"
+	cp ~/install-arch/ /mnt -r
+	arch-chroot /mnt
 }
 
 function ZoneInfo()
 {
 	ls /usr/share/zoneinfo/
 
-	echo "Select region: "
-	read region
+    takeInput "Region"
+    setValue "Zone" "region" $input
 
-	ls /usr/share/zoneinfo/$region/
+	ls /usr/share/zoneinfo/$(getValue "Zone" "region")/
 
-	echo "Select city: "
-	read city
+    takeInput "City"
+    setValue "Zone" "city" $input
 
-	ln -sf /usr/share/zoneinfo/$region/$city /etc/localtime
+	ln -sf /usr/share/zoneinfo/$(getValue "Zone" "region")/$(getValue "Zone" "city")/etc/localtime
 
 	hwclock --systohc
 
@@ -115,97 +107,99 @@ function ZoneInfo()
 
 function User()
 {
-	echo "Hostname: "
-	read hostname
+    takeInput "Hostname"
+    setValue "User" "hostname" $input
 
 	touch /etc/hostname
-	echo $hostname > /etc/hostname
+	echo $(getValue "User" "hostname") > /etc/hostname
 
 	echo "
 	127.0.0.1   localhost
 	::1         localhost
-	127.0.0.1   $hostname.localdomain   $hostname
+	127.0.0.1   $(getValue "User" "hostname").localdomain   $(getValue "User" "hostname")
 	" > /etc/hosts
 
 	echo "Root Password: "
 	passwd
 
+    takeInput "Hostname"
+    setValue "User" "user" $input
 
-	echo "New User: "
-	read user
+	useradd -m $(getValue "User" "user")
 
-	useradd -m $user
+	echo "$(getValue "User" "user")password: "
+	passwd $(getValue "User" "user")
 
-	echo "$user password: "
-	passwd $user
-
-	usermod -aG wheel,audio,video,storage,optical,$user $user
+	usermod -aG wheel,audio,video,storage,optical,$(getValue "User" "user") $(getValue "User" "user")
 }
-
 
 function Install()
 {
 	pacman -S sudo grub efibootmgr dosfstools os-prober mtools
 
 	mkdir /boot/EFI
-	mount /dev/$efi /boot/EFI
+	mount /dev/$(getValue "Disk" "efi") /boot/EFI
 
 	grub-install --target=x86_64-efi --bootloader-id=grub_uefi --recheck
 	grub-mkconfig -o /boot/grub/grub.cfg
 
-	pacman -S iwd iw wireless_tools wpa_supplicant nm-connection-editor networkmanager neovim git
+	pacman -S iwd iw wireless_tools wpa_supplicant nm-connection-editor networkmanager neovim git geany xorg xorg-xinit xorg-server i3 xf86-video-intel thunar nitrogen picom git gcc python python-pip dmenu xfce4-terminal xfce4-settings firefox base-devel nodejs npm
 
 	systemctl enable NetworkManager
 
 	EDITOR=nvim visudo
 }
 
-
-
-function takeInput()
+function menu()
 {
-	read input
-	echo $input
-}
+    clear
 
-function checkInput()
-{
-	if [[ $1 == "1" ]]; then
-		Network
-	elif [[ $1 == "2" ]]; then
-		KeyMapping
-	elif [[ $1 == "3" ]]; then
+	echo "==========================="
+	echo "[Arch base linux installer]"
+	echo "==========================="
+
+	echo "1) Network"
+	echo "2) Keymap"
+	echo "3) Timezone"
+	echo "4) Disk"
+	echo "5) Base Install"
+	echo "6) Zone Info"
+	echo "7) User setup"
+	echo "8) Install"
+    echo "9) Auto Install"
+	echo "0) Reboot"
+
+    takeInput @
+
+	if [[ $input == "1" ]]; then
+        Network
+        menu
+	elif [[ $input == "2" ]]; then
+        KeyMapping
+        menu
+	elif [[ $input == "3" ]]; then
 		Timezone
-	elif [[ $1 == "4" ]]; then
+		menu
+	elif [[ $input == "4" ]]; then
 		Disk
-	elif [[ $1 == "5" ]]; then
+		menu
+	elif [[ $input == "5" ]]; then
 		BaseInstallation
-	elif [[ $1 == "6" ]]; then
+		menu
+	elif [[ $input == "6" ]]; then
 		ZoneInfo
-	elif [[ $1 == "7" ]]; then
+		menu
+	elif [[ $input == "7" ]]; then
 		User
-	elif [[ $1 == "8" ]]; then
+		menu
+	elif [[ $input == "8" ]]; then
 		Install
-	elif [[ $1 == "0" ]]; then
+		menu
+	elif [[ $input == "0" ]]; then
 		umount -l /mnt
 		reboot
 	fi
 }
 
 
-echo "==========================="
-echo "[Arch base linux installer]"
-echo "==========================="
-
-echo "1) Network"
-echo "2) Keymap"
-echo "3) Timezone"
-echo "4) Disk"
-echo "5) Base Install"
-echo "6) Zone Info"
-echo "7) User setup"
-echo "8) Install"
-echo "0) Reboot"
-
-option=$(takeInput)
-checkInput $option
+menu
