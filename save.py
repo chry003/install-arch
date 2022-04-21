@@ -1,41 +1,12 @@
 import sys, json, subprocess
 
 global_variables = {
-    "Network": 
-    {
-        "dev": "",
-        "ssid": "",
-        "pass": ""
-    },
-    
-    "Keymap":
-    {
-        "keymap": ""
-    },
-
-    "Timezone": 
-    {
-        "timezone": ""
-    },
-
-    "Disk":
-    {
-        "disk": "",
-        "efi": "",
-        "swap": "",
-        "rootfs": ""
-    },
-
-    "Zone":
-    {
-        "region": "",
-        "city": ""
-    },
-
-    "User":
+    "user":
     {
         "hostname": "",
-        "user": ""
+        "homeuser": "",
+        "region": "",
+        "city": ""
     }
 }
 
