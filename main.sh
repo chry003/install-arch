@@ -91,3 +91,14 @@ function step2()
 
 	EDITOR=nvim visudo
 }
+
+echo "Step 1: Base Installation"
+echo "Step 2: Final Installation"
+
+takeInput "Option"
+
+if [[ $input == "1" ]]; then
+	step1
+elif [[ $input == "2" ]]; then
+	step2
+fi
